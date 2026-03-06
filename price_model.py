@@ -1,31 +1,27 @@
 """
 Long-horizon stock price prediction (1, 5, or 10 years).
-Uses historical annualized return for compound-growth prediction and
-optional linear regression on log-price trend for robustness.
+
+Simplified design:
+- use this stock's past daily data
+- train a single regression model (RandomForestRegressor) to predict 1‑year forward return
+- use that predicted 1‑year return as the annual growth rate
+  for 1, 5, or 10‑year price forecasts.
+
+We only expose the final predicted prices, not accuracy/R² metrics.
 """
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import Ridge
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 
-from processor import add_features, get_feature_summary
+from processor import get_feature_summary, RISK_FEATURES
 
 
 # Supported horizons (years)
 HORIZONS = (1, 5, 10)
 
-
-def _annualized_return_from_returns(daily_returns: pd.Series) -> float:
-    """Compound annualized return from daily returns (~252 trading days/year)."""
-    if daily_returns is None or len(daily_returns.dropna()) < 2:
-        return 0.0
-    total = (1 + daily_returns).prod()
-    n_days = len(daily_returns.dropna())
-    if n_days <= 0:
-        return 0.0
-    years = n_days / 252.0
-    if years <= 0:
-        return 0.0
-    return float(total ** (1 / years) - 1)
+# Reuse the same feature set as the risk model
+PRICE_FEATURES = RISK_FEATURES
 
 
 def predict_price_with_growth(
@@ -35,7 +31,7 @@ def predict_price_with_growth(
 ) -> dict:
     """
     Predict future price using compound growth: P_future = P_now * (1 + r)^years.
-    Optionally cap r to a sane range for display (e.g. -50% to +50% annual).
+    Caps r to [-50%, +50%] per year to avoid extreme outputs.
     """
     r = np.clip(annualized_return, -0.5, 0.5)
     predicted = latest_close * ((1 + r) ** years)
@@ -47,36 +43,62 @@ def predict_price_with_growth(
     }
 
 
-def predict_price_with_regression(processed_df: pd.DataFrame, years: int) -> float | None:
+def _train_return_model(
+    processed_df: pd.DataFrame,
+    test_size: float = 0.2,
+    random_state: int = 42,
+):
     """
-    Simple trend: regress log(close) on time index, then extrapolate.
-    Returns predicted price at (last_date + years) or None if insufficient data.
+    Train a RandomForestRegressor to predict 1‑year forward return.
+
+    Target: future 1‑year return = close(t+252 trading days) / close(t) - 1.
     """
     if processed_df is None or processed_df.empty or "close" not in processed_df.columns:
         return None
+
     df = processed_df.copy()
-    df = df.dropna(subset=["close"])
-    if len(df) < 30:
+    steps_ahead = 252  # ~1 trading year
+    df["future_1y_return"] = df["close"].shift(-steps_ahead) / df["close"] - 1
+
+    cols_needed = list(PRICE_FEATURES) + ["future_1y_return"]
+    train_df = df.dropna(subset=cols_needed)
+    if len(train_df) < 80:
         return None
-    y = np.log(df["close"].values)
-    X = np.arange(len(y)).reshape(-1, 1)
-    # Last date is roughly "today"; we want today + years (approx 252 * years trading days)
-    steps_ahead = int(252 * years)
-    model = Ridge(alpha=1.0, random_state=42)
-    model.fit(X, y)
-    future_idx = len(y) + steps_ahead - 1
-    log_future = model.predict([[future_idx]])[0]
-    return float(np.exp(log_future))
+
+    X = train_df[PRICE_FEATURES]
+    y = train_df["future_1y_return"]
+
+    X_train, _, y_train, _ = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        shuffle=False,  # validate on later data
+    )
+
+    model = RandomForestRegressor(
+        n_estimators=300,
+        max_depth=None,
+        random_state=random_state,
+    )
+    model.fit(X_train, y_train)
+    return model
 
 
 def predict_future_price(
     processed_df: pd.DataFrame,
     years: int,
-    method: str = "growth",
 ) -> dict:
     """
-    Main entry: predict price in `years` (1, 5, or 10).
-    method: "growth" (compound growth from history) or "regression" (log-price trend).
+    Predict price in `years` (1, 5, or 10) using a single regression model on past data.
+
+    Steps:
+      1. Train a RandomForestRegressor to predict 1‑year forward return.
+      2. Use its predicted 1‑year return as the annualized rate r.
+      3. Forecast price for 1, 5, or 10 years via compound growth.
+
+    If there is not enough data to train the regressor, fall back to using the
+    historical annualized return from `get_feature_summary`.
     """
     if years not in HORIZONS:
         years = min(HORIZONS, key=lambda h: abs(h - years))
@@ -91,19 +113,21 @@ def predict_future_price(
         }
 
     latest_close = summary["latest_close"]
-    ann_return = summary.get("annualized_return", 0.0) or 0.0
 
-    out = predict_price_with_growth(latest_close, ann_return, years)
-    out["method"] = "compound_growth"
+    # 1) Try to train a regression model on 1‑year forward returns
+    model = _train_return_model(processed_df)
 
-    if method == "regression":
-        reg_price = predict_price_with_regression(processed_df, years)
-        if reg_price is not None:
-            out["predicted_price_regression"] = round(reg_price, 2)
-            # Blend or prefer regression if you want
-            out["predicted_price"] = round(
-                0.5 * out["predicted_price"] + 0.5 * reg_price, 2
-            )
-            out["method"] = "blend_growth_and_regression"
+    if model is not None:
+        latest_row = processed_df.dropna(subset=PRICE_FEATURES).iloc[[-1]]
+        pred_ret_1y = float(model.predict(latest_row[PRICE_FEATURES])[0])
+        ann_return = pred_ret_1y
+        out = predict_price_with_growth(latest_close, ann_return, years)
+        out["method"] = "learned_regression_1y"
+        return out
 
+    # 2) Fallback: simple historical growth if we cannot train a model
+    ann_return_hist = summary.get("annualized_return", 0.0) or 0.0
+    out = predict_price_with_growth(latest_close, ann_return_hist, years)
+    out["method"] = "historical_growth_fallback"
     return out
+

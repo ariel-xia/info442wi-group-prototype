@@ -1,12 +1,16 @@
 """
 Random Forest classifier for stock risk level: Low (0), Medium (1), High (2).
-Uses features from processor.RISK_FEATURES.
+
+Simplified design:
+- use this stock's past days with a known `risk_level`
+- train a single RandomForestClassifier
+- use it to predict today's risk level.
+
+We do NOT return accuracy or other metrics – only the trained model.
 """
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
 
 from processor import RISK_FEATURES
 
@@ -14,33 +18,40 @@ TARGET = "risk_level"
 RISK_LABELS = {0: "Low", 1: "Medium", 2: "High"}
 
 
-def train(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 42, verbose: bool = False):
+def train(
+    df: pd.DataFrame,
+    test_size: float = 0.2,
+    random_state: int = 42,
+) -> RandomForestClassifier:
     """
-    Train Random Forest on processed DataFrame. Requires risk_level and RISK_FEATURES.
+    Train a Random Forest on past labeled days for this stock.
     """
     for col in RISK_FEATURES + [TARGET]:
         if col not in df.columns:
             raise ValueError(f"Missing column for risk model: {col}")
 
-    # Train only on rows with known risk_level (last row is NaN for next_return/risk_level)
+    # Only rows with known label (last row is NaN for next_return / risk_level)
     train_df = df.dropna(subset=[TARGET])
-    if len(train_df) < 20:
+    if len(train_df) < 50:
         raise ValueError("Not enough rows with risk_level for training")
 
     X = train_df[RISK_FEATURES]
     y = train_df[TARGET]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state, shuffle=False
+    X_train, _, y_train, _ = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        shuffle=False,  # respect time order
     )
 
-    model = RandomForestClassifier(n_estimators=100, random_state=random_state)
+    model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=None,
+        random_state=random_state,
+    )
     model.fit(X_train, y_train)
-
-    if verbose:
-        y_pred = model.predict(X_test)
-        print("Risk model (3-class) classification report:")
-        print(classification_report(y_test, y_pred, target_names=[RISK_LABELS[i] for i in range(3)]))
     return model
 
 

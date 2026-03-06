@@ -31,9 +31,30 @@
         <div id="view-dashboard" class="view-section block">
             <header class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
                 <h2 class="text-xl font-semibold text-slate-800">Stock Evaluation</h2>
-                <div class="relative w-72">
-                    <input type="text" placeholder="Search tech ticker (e.g. AAPL, NVDA)" class="w-full pl-4 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm" value="NVDA">
-                    <button class="absolute right-3 top-2 text-slate-400 hover:text-indigo-600 font-bold">Search</button>
+                <div class="flex items-center gap-3">
+                    <div class="relative w-64">
+                        <input
+                            id="ticker-input"
+                            type="text"
+                            placeholder="Search tech ticker (e.g. AAPL, NVDA)"
+                            class="w-full pl-4 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+                            value="NVDA"
+                        >
+                        <button
+                            id="search-button"
+                            class="absolute right-3 top-2 text-slate-400 hover:text-indigo-600 font-bold"
+                        >
+                            Search
+                        </button>
+                    </div>
+                    <select
+                        id="years-select"
+                        class="border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    >
+                        <option value="1">1 year</option>
+                        <option value="5">5 years</option>
+                        <option value="10">10 years</option>
+                    </select>
                 </div>
             </header>
 
@@ -41,20 +62,20 @@
                 <div class="col-span-1 flex flex-col gap-6">
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <div class="flex justify-between items-start mb-2">
-                            <h2 class="text-4xl font-extrabold text-slate-900">NVDA</h2>
-                            <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">+2.4% Today</span>
+                            <h2 id="ui-ticker-symbol" class="text-4xl font-extrabold text-slate-900">NVDA</h2>
+                            <span id="ui-ticker-change" class="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">+2.4% Today</span>
                         </div>
-                        <p class="text-slate-500 mb-4">Nvidia Corporation</p>
-                        <div class="text-3xl font-bold text-slate-800">$875.28</div>
+                        <p id="ui-ticker-name" class="text-slate-500 mb-4">Nvidia Corporation</p>
+                        <div id="ui-current-price" class="text-3xl font-bold text-slate-800">$875.28</div>
                     </div>
 
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Risk Assessment</h3>
                         <div class="flex items-center gap-4 mb-6">
-                            <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center border-4 border-red-500 text-red-600 font-bold text-xl">HI</div>
+                            <div id="ui-risk-badge" class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center border-4 border-red-500 text-red-600 font-bold text-xl">HI</div>
                             <div>
-                                <div class="text-xl font-bold text-slate-800">High Risk</div>
-                                <p class="text-sm text-slate-500">High historical volatility.</p>
+                                <div id="ui-risk-label" class="text-xl font-bold text-slate-800">High Risk</div>
+                                <p id="ui-risk-copy" class="text-sm text-slate-500">High historical volatility.</p>
                             </div>
                         </div>
                         <div class="space-y-3 border-t border-slate-100 pt-4">
@@ -73,12 +94,12 @@
                 <div class="col-span-1 lg:col-span-2 flex flex-col gap-6">
                     <div class="bg-indigo-600 p-6 rounded-xl shadow-sm text-white flex justify-between items-center">
                         <div>
-                            <h3 class="text-indigo-200 text-sm font-semibold uppercase tracking-wider mb-1">3-Month Expected Return</h3>
-                            <p class="text-3xl font-bold">+ 12.5%</p>
+                            <h3 id="ui-horizon-label" class="text-indigo-200 text-sm font-semibold uppercase tracking-wider mb-1">Expected Return</h3>
+                            <p id="ui-expected-return" class="text-3xl font-bold">+ 12.5%</p>
                         </div>
                         <div class="text-right">
                             <p class="text-indigo-200 text-sm mb-1">Projected Target</p>
-                            <p class="text-2xl font-semibold">$984.50</p>
+                            <p id="ui-projected-price" class="text-2xl font-semibold">$984.50</p>
                         </div>
                     </div>
 
@@ -238,6 +259,87 @@
             const activeBtn = document.getElementById('nav-' + targetView);
             activeBtn.className = 'w-full text-left px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-medium transition-colors';
         }
+
+        async function analyzeStock() {
+            const input = document.getElementById('ticker-input');
+            const yearsSelect = document.getElementById('years-select');
+            if (!input) return;
+            const symbol = (input.value || '').trim().toUpperCase();
+            const years = yearsSelect ? yearsSelect.value : 1;
+            if (!symbol) return;
+
+            try {
+                const res = await fetch(`/api/analyze?symbol=${encodeURIComponent(symbol)}&years=${encodeURIComponent(years)}`);
+                if (!res.ok) {
+                    console.error('API error', await res.text());
+                    return;
+                }
+                const data = await res.json();
+                const pp = data.predicted_price || {};
+                const risk = data.risk || {};
+
+                const symbolEl = document.getElementById('ui-ticker-symbol');
+                const nameEl = document.getElementById('ui-ticker-name');
+                const priceEl = document.getElementById('ui-current-price');
+                const projPriceEl = document.getElementById('ui-projected-price');
+                const expectedReturnEl = document.getElementById('ui-expected-return');
+                const riskLabelEl = document.getElementById('ui-risk-label');
+                const riskCopyEl = document.getElementById('ui-risk-copy');
+                const riskBadgeEl = document.getElementById('ui-risk-badge');
+                const horizonLabelEl = document.getElementById('ui-horizon-label');
+
+                if (symbolEl) symbolEl.textContent = data.symbol || symbol;
+                if (nameEl) nameEl.textContent = data.symbol || symbol;
+
+                const currentPrice = data.current_price ?? pp.current_price;
+                if (priceEl && currentPrice != null) {
+                    priceEl.textContent = `$${Number(currentPrice).toFixed(2)}`;
+                }
+
+                if (projPriceEl && pp.value != null) {
+                    projPriceEl.textContent = `$${Number(pp.value).toFixed(2)}`;
+                }
+                if (expectedReturnEl && currentPrice != null && pp.value != null) {
+                    const ret = (pp.value - currentPrice) / currentPrice * 100;
+                    expectedReturnEl.textContent = `${ret >= 0 ? '+ ' : ''}${ret.toFixed(1)}%`;
+                }
+                if (horizonLabelEl && pp.years != null) {
+                    horizonLabelEl.textContent = `${pp.years}-Year Expected Return`.toUpperCase();
+                }
+
+                if (riskLabelEl && risk.level) {
+                    riskLabelEl.textContent = `${risk.level} Risk`;
+                }
+                if (riskCopyEl && risk.confidence != null) {
+                    riskCopyEl.textContent = `Model confidence: ${(risk.confidence * 100).toFixed(1)}%.`;
+                }
+                if (riskBadgeEl && risk.level) {
+                    const level = String(risk.level).toUpperCase();
+                    riskBadgeEl.textContent = level.startsWith('H') ? 'HI' : level.startsWith('L') ? 'LO' : 'MED';
+                    riskBadgeEl.className = 'w-16 h-16 rounded-full flex items-center justify-center border-4 font-bold text-xl ' +
+                        (level.startsWith('H')
+                            ? 'bg-red-100 border-red-500 text-red-600'
+                            : level.startsWith('L')
+                                ? 'bg-emerald-100 border-emerald-500 text-emerald-600'
+                                : 'bg-yellow-100 border-yellow-500 text-yellow-700');
+                }
+            } catch (err) {
+                console.error('analyzeStock error', err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchBtn = document.getElementById('search-button');
+            const input = document.getElementById('ticker-input');
+            if (searchBtn) {
+                searchBtn.addEventListener('click', analyzeStock);
+            }
+            if (input) {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') analyzeStock();
+                });
+            }
+        });
     </script>
 </body>
 </html>

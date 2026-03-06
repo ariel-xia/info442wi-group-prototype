@@ -52,7 +52,7 @@ def run_pipeline(symbol: str, horizon_years: int = 1) -> dict:
     risk_out = predict_risk(risk_model, latest)
 
     # 4) Price prediction for chosen horizon
-    price_out = predict_future_price(df, years=horizon_years, method="growth")
+    price_out = predict_future_price(df, years=horizon_years)
 
     # Optional: attach current quote from Finnhub if available
     quote = get_quote(symbol)
@@ -70,6 +70,7 @@ def run_pipeline(symbol: str, horizon_years: int = 1) -> dict:
             "years": horizon_years,
             "annualized_return_used": price_out.get("annualized_return_used"),
             "current_price": price_out.get("current_price"),
+            "method": price_out.get("method"),
         },
         "risk": {
             "level": risk_out["level"],

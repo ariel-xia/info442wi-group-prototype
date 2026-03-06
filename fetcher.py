@@ -28,12 +28,18 @@ def get_quote(symbol: str) -> dict | None:
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Flatten MultiIndex columns to lowercase single-level names."""
+    """Flatten MultiIndex columns to lowercase single-level names (Open, High, Low, Close, Volume)."""
+    df = df.copy()
     if isinstance(df.columns, pd.MultiIndex):
-        df = df.copy()
-        df.columns = [str(c).lower() for c in df.columns.get_level_values(0)]
+        # With group_by="ticker", level 0 is ticker (e.g. AAPL), level 1 is metric (Open, Close, ...)
+        level_0 = df.columns.get_level_values(0)
+        level_1 = df.columns.get_level_values(1)
+        # Use level that looks like OHLCV (has 'open'/'close' etc), else level 0
+        if len(level_1) and str(level_1[0]).lower() in ("open", "high", "low", "close", "volume", "adj close"):
+            df.columns = [str(c).lower() for c in level_1]
+        else:
+            df.columns = [str(c).lower() for c in level_0]
     else:
-        df = df.copy()
         df.columns = [str(c).lower() for c in df.columns]
     return df
 
