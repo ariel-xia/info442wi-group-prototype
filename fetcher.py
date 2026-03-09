@@ -3,6 +3,7 @@ Data fetching for stock analysis. Uses Finnhub for real-time quotes (optional)
 and yfinance for historical OHLCV data (the main DataFrame source for models).
 """
 import os
+from typing import Optional, Dict, Any
 import pandas as pd
 import yfinance as yf
 from dotenv import load_dotenv
@@ -16,8 +17,7 @@ try:
 except ImportError:
     client = None
 
-
-def get_quote(symbol: str) -> dict | None:
+def get_quote(symbol: str) -> Optional[Dict[str, Any]]:
     """Current quote from Finnhub. Returns None if API key missing or request fails."""
     if client is None:
         return None

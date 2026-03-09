@@ -38,7 +38,7 @@
                             type="text"
                             placeholder="Search tech ticker (e.g. AAPL, NVDA)"
                             class="w-full pl-4 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
-                            value="NVDA"
+                            value="AAPL"
                         >
                         <button
                             id="search-button"
@@ -46,6 +46,16 @@
                         >
                             Search
                         </button>
+                    </div>
+                    <button
+                        id="refresh-button"
+                        class="border border-slate-300 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        title="Refresh prediction"
+                    >
+                        Refresh
+                    </button>
+                    <div class="text-xs text-slate-500 whitespace-nowrap">
+                        Updated: <span id="ui-last-updated">—</span>
                     </div>
                     <select
                         id="years-select"
@@ -129,52 +139,8 @@
                 <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">+ Add Ticker</button>
             </header>
 
-            <div class="p-8 max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition-colors cursor-pointer">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold text-slate-900">AAPL</h3>
-                            <p class="text-xs text-slate-500">Apple Inc.</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-lg font-bold text-slate-800">$172.50</div>
-                            <div class="text-sm font-medium text-green-600">+1.2%</div>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center pt-4 border-t border-slate-100">
-                        <div>
-                            <p class="text-xs text-slate-400 uppercase tracking-wide">Risk</p>
-                            <p class="text-sm font-bold text-yellow-600">Medium</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xs text-slate-400 uppercase tracking-wide">Expected (3M)</p>
-                            <p class="text-sm font-bold text-emerald-600">+5.4%</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition-colors cursor-pointer">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold text-slate-900">AMD</h3>
-                            <p class="text-xs text-slate-500">Advanced Micro Devices</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-lg font-bold text-slate-800">$180.15</div>
-                            <div class="text-sm font-medium text-red-600">-0.8%</div>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center pt-4 border-t border-slate-100">
-                        <div>
-                            <p class="text-xs text-slate-400 uppercase tracking-wide">Risk</p>
-                            <p class="text-sm font-bold text-red-600">High</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xs text-slate-400 uppercase tracking-wide">Expected (3M)</p>
-                            <p class="text-sm font-bold text-emerald-600">+14.2%</p>
-                        </div>
-                    </div>
-                </div>
+            <div class="p-8 max-w-6xl mx-auto w-full">
+                <div id="watchlist-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </div>
         </div>
 
@@ -236,6 +202,218 @@
     </main>
 
     <script>
+        function formatTimestamp(tsMs) {
+            try {
+                return new Date(tsMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            } catch {
+                return '—';
+            }
+        }
+
+        function setLastUpdated(tsMs) {
+            const el = document.getElementById('ui-last-updated');
+            if (!el) return;
+            el.textContent = tsMs ? formatTimestamp(tsMs) : '—';
+        }
+
+        function computeExpectedReturnPct(currentPrice, predictedPrice) {
+            const cp = Number(currentPrice);
+            const pp = Number(predictedPrice);
+            if (!Number.isFinite(cp) || !Number.isFinite(pp) || cp === 0) return null;
+            return (pp - cp) / cp * 100;
+        }
+
+        function renderAnalysis(data, fallbackSymbol, fallbackYears) {
+            const pp = data?.predicted_price || {};
+            const risk = data?.risk || {};
+            const symbol = data?.symbol || fallbackSymbol;
+            const years = pp?.years ?? fallbackYears;
+
+            const symbolEl = document.getElementById('ui-ticker-symbol');
+            const nameEl = document.getElementById('ui-ticker-name');
+            const priceEl = document.getElementById('ui-current-price');
+            const projPriceEl = document.getElementById('ui-projected-price');
+            const expectedReturnEl = document.getElementById('ui-expected-return');
+            const riskLabelEl = document.getElementById('ui-risk-label');
+            const riskCopyEl = document.getElementById('ui-risk-copy');
+            const riskBadgeEl = document.getElementById('ui-risk-badge');
+            const horizonLabelEl = document.getElementById('ui-horizon-label');
+
+            if (symbolEl) symbolEl.textContent = symbol || '';
+            if (nameEl) nameEl.textContent = data?.name || symbol || '';
+
+            const currentPrice = data?.current_price ?? pp?.current_price;
+            if (priceEl && currentPrice != null) {
+                priceEl.textContent = `$${Number(currentPrice).toFixed(2)}`;
+            }
+
+            if (projPriceEl && pp?.value != null) {
+                projPriceEl.textContent = `$${Number(pp.value).toFixed(2)}`;
+            }
+            if (expectedReturnEl && currentPrice != null && pp?.value != null) {
+                const ret = (pp.value - currentPrice) / currentPrice * 100;
+                expectedReturnEl.textContent = `${ret >= 0 ? '+ ' : ''}${ret.toFixed(1)}%`;
+            }
+            if (horizonLabelEl && years != null) {
+                horizonLabelEl.textContent = `${years}-Year Expected Return`.toUpperCase();
+            }
+
+            if (riskLabelEl && risk?.level) {
+                riskLabelEl.textContent = `${risk.level} Risk`;
+            }
+            if (riskCopyEl && risk?.confidence != null) {
+                riskCopyEl.textContent = `Model confidence: ${(risk.confidence * 100).toFixed(1)}%.`;
+            }
+            if (riskBadgeEl && risk?.level) {
+                const level = String(risk.level).toUpperCase();
+                riskBadgeEl.textContent = level.startsWith('H') ? 'HI' : level.startsWith('L') ? 'LO' : 'MED';
+                riskBadgeEl.className = 'w-16 h-16 rounded-full flex items-center justify-center border-4 font-bold text-xl ' +
+                    (level.startsWith('H')
+                        ? 'bg-red-100 border-red-500 text-red-600'
+                        : level.startsWith('L')
+                            ? 'bg-emerald-100 border-emerald-500 text-emerald-600'
+                            : 'bg-yellow-100 border-yellow-500 text-yellow-700');
+            }
+
+            setLastUpdated(Date.now());
+        }
+
+        const MOCK_ANALYSIS = {
+            AAPL: {
+                1: {
+                    symbol: 'AAPL',
+                    current_price: 257.46,
+                    predicted_price: { value: 273.05, years: 1, current_price: 257.46 },
+                    risk: { level: 'Medium', confidence: 0.43 },
+                },
+                5: {
+                    symbol: 'AAPL',
+                    current_price: 257.46,
+                    predicted_price: { value: 72.16, years: 5, current_price: 257.46 },
+                    risk: { level: 'Medium', confidence: 0.54 },
+                },
+                10: {
+                    symbol: 'AAPL',
+                    current_price: 257.46,
+                    predicted_price: { value: 20.21, years: 10, current_price: 257.46 },
+                    risk: { level: 'Medium', confidence: 0.545 },
+                },
+            },
+            MSFT: {
+                1: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 453.21, years: 1, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.505 } },
+                5: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 83.52, years: 5, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.525 } },
+                10: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 17.0, years: 10, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.525 } },
+            },
+            NVDA: {
+                1: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 231.42, years: 1, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.545 } },
+                5: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 100.03, years: 5, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.4 } },
+                10: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 45.41, years: 10, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.4 } },
+            },
+            GOOGL: {
+                1: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 334.29, years: 1, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.665 } },
+                5: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 38.52, years: 5, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.5 } },
+                10: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 4.96, years: 10, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.49 } },
+            },
+            AMZN: {
+                1: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 222.81, years: 1, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.525 } },
+                5: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 52.63, years: 5, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.42 } },
+                10: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 12.99, years: 10, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.42 } },
+            },
+            META: {
+                1: { symbol: 'META', current_price: 644.86, predicted_price: { value: 707.0, years: 1, current_price: 644.86 }, risk: { level: 'Medium', confidence: 0.575 } },
+                5: { symbol: 'META', current_price: 644.86, predicted_price: { value: 20.15, years: 5, current_price: 644.86 }, risk: { level: 'Low', confidence: 0.485 } },
+                10: { symbol: 'META', current_price: 644.86, predicted_price: { value: 0.63, years: 10, current_price: 644.86 }, risk: { level: 'Low', confidence: 0.495 } },
+            },
+            TSLA: {
+                1: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 452.81, years: 1, current_price: 396.73 }, risk: { level: 'Low', confidence: 0.405 } },
+                5: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 12.53, years: 5, current_price: 396.73 }, risk: { level: 'High', confidence: 0.475 } },
+                10: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 0.4, years: 10, current_price: 396.73 }, risk: { level: 'High', confidence: 0.475 } },
+            },
+            AMD: {
+                1: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 201.46, years: 1, current_price: 192.43 }, risk: { level: 'High', confidence: 0.395 } },
+                5: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 6.01, years: 5, current_price: 192.43 }, risk: { level: 'Low', confidence: 0.505 } },
+                10: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 0.19, years: 10, current_price: 192.43 }, risk: { level: 'Low', confidence: 0.505 } },
+            },
+        };
+
+        const WATCHLIST = [
+            { symbol: 'AAPL', name: 'Apple Inc.' },
+            { symbol: 'MSFT', name: 'Microsoft Corp.' },
+            { symbol: 'NVDA', name: 'NVIDIA Corp.' },
+            { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+            { symbol: 'AMZN', name: 'Amazon.com Inc.' },
+            { symbol: 'META', name: 'Meta Platforms Inc.' },
+            { symbol: 'TSLA', name: 'Tesla Inc.' },
+            { symbol: 'AMD', name: 'Advanced Micro Devices' },
+        ];
+
+        function setInputAndAnalyze(symbol) {
+            const input = document.getElementById('ticker-input');
+            if (input) input.value = symbol;
+            switchView('dashboard');
+            analyzeStock();
+        }
+
+        function renderWatchlist() {
+            const grid = document.getElementById('watchlist-grid');
+            if (!grid) return;
+
+            const yearsSelect = document.getElementById('years-select');
+            const years = yearsSelect ? Number(yearsSelect.value) : 1;
+
+            const cards = WATCHLIST.map(({ symbol, name }) => {
+                const mock = MOCK_ANALYSIS?.[symbol]?.[years] || MOCK_ANALYSIS?.[symbol]?.[1] || null;
+                const pp = mock?.predicted_price || {};
+                const currentPrice = mock?.current_price ?? pp?.current_price;
+                const predicted = pp?.value;
+                const risk = mock?.risk || {};
+                const ret = (currentPrice != null && predicted != null) ? computeExpectedReturnPct(currentPrice, predicted) : null;
+
+                const retText = ret == null ? '—' : `${ret >= 0 ? '+ ' : ''}${ret.toFixed(1)}%`;
+                const retClass = ret == null ? 'text-slate-500' : (ret >= 0 ? 'text-emerald-600' : 'text-red-600');
+
+                const riskLevel = (risk.level || 'Unknown');
+                const riskClass =
+                    String(riskLevel).toLowerCase().startsWith('h') ? 'text-red-600' :
+                    String(riskLevel).toLowerCase().startsWith('l') ? 'text-emerald-600' :
+                    String(riskLevel).toLowerCase().startsWith('m') ? 'text-yellow-600' :
+                    'text-slate-500';
+
+                const priceText = (currentPrice == null) ? '—' : `$${Number(currentPrice).toFixed(2)}`;
+
+                return `
+                    <button
+                        type="button"
+                        class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition-colors text-left"
+                        onclick="setInputAndAnalyze('${symbol}')"
+                    >
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-slate-900">${symbol}</h3>
+                                <p class="text-xs text-slate-500">${name}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-lg font-bold text-slate-800">${priceText}</div>
+                                <div class="text-sm font-medium ${retClass}">${retText}</div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center pt-4 border-t border-slate-100">
+                            <div>
+                                <p class="text-xs text-slate-400 uppercase tracking-wide">Risk</p>
+                                <p class="text-sm font-bold ${riskClass}">${riskLevel}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-slate-400 uppercase tracking-wide">Expected (${years}Y)</p>
+                                <p class="text-sm font-bold ${retClass}">${retText}</p>
+                            </div>
+                        </div>
+                    </button>
+                `;
+            });
+
+            grid.innerHTML = cards.join('');
+        }
+
         function switchView(targetView) {
             // Hide all main content sections
             const views = document.querySelectorAll('.view-section');
@@ -265,80 +443,68 @@
             const yearsSelect = document.getElementById('years-select');
             if (!input) return;
             const symbol = (input.value || '').trim().toUpperCase();
-            const years = yearsSelect ? yearsSelect.value : 1;
+            const years = yearsSelect ? Number(yearsSelect.value) : 1;
             if (!symbol) return;
 
             try {
+                const shouldUseMockFirst = (location.protocol === 'file:');
+                if (shouldUseMockFirst) {
+                    const mock = MOCK_ANALYSIS?.[symbol]?.[years];
+                    if (mock) {
+                        renderAnalysis(mock, symbol, years);
+                        return;
+                    }
+                }
+
                 const res = await fetch(`/api/analyze?symbol=${encodeURIComponent(symbol)}&years=${encodeURIComponent(years)}`);
                 if (!res.ok) {
-                    console.error('API error', await res.text());
+                    const text = await res.text();
+                    console.error('API error', text);
+                    const mock = MOCK_ANALYSIS?.[symbol]?.[years];
+                    if (mock) {
+                        renderAnalysis(mock, symbol, years);
+                    }
                     return;
                 }
                 const data = await res.json();
-                const pp = data.predicted_price || {};
-                const risk = data.risk || {};
-
-                const symbolEl = document.getElementById('ui-ticker-symbol');
-                const nameEl = document.getElementById('ui-ticker-name');
-                const priceEl = document.getElementById('ui-current-price');
-                const projPriceEl = document.getElementById('ui-projected-price');
-                const expectedReturnEl = document.getElementById('ui-expected-return');
-                const riskLabelEl = document.getElementById('ui-risk-label');
-                const riskCopyEl = document.getElementById('ui-risk-copy');
-                const riskBadgeEl = document.getElementById('ui-risk-badge');
-                const horizonLabelEl = document.getElementById('ui-horizon-label');
-
-                if (symbolEl) symbolEl.textContent = data.symbol || symbol;
-                if (nameEl) nameEl.textContent = data.symbol || symbol;
-
-                const currentPrice = data.current_price ?? pp.current_price;
-                if (priceEl && currentPrice != null) {
-                    priceEl.textContent = `$${Number(currentPrice).toFixed(2)}`;
-                }
-
-                if (projPriceEl && pp.value != null) {
-                    projPriceEl.textContent = `$${Number(pp.value).toFixed(2)}`;
-                }
-                if (expectedReturnEl && currentPrice != null && pp.value != null) {
-                    const ret = (pp.value - currentPrice) / currentPrice * 100;
-                    expectedReturnEl.textContent = `${ret >= 0 ? '+ ' : ''}${ret.toFixed(1)}%`;
-                }
-                if (horizonLabelEl && pp.years != null) {
-                    horizonLabelEl.textContent = `${pp.years}-Year Expected Return`.toUpperCase();
-                }
-
-                if (riskLabelEl && risk.level) {
-                    riskLabelEl.textContent = `${risk.level} Risk`;
-                }
-                if (riskCopyEl && risk.confidence != null) {
-                    riskCopyEl.textContent = `Model confidence: ${(risk.confidence * 100).toFixed(1)}%.`;
-                }
-                if (riskBadgeEl && risk.level) {
-                    const level = String(risk.level).toUpperCase();
-                    riskBadgeEl.textContent = level.startsWith('H') ? 'HI' : level.startsWith('L') ? 'LO' : 'MED';
-                    riskBadgeEl.className = 'w-16 h-16 rounded-full flex items-center justify-center border-4 font-bold text-xl ' +
-                        (level.startsWith('H')
-                            ? 'bg-red-100 border-red-500 text-red-600'
-                            : level.startsWith('L')
-                                ? 'bg-emerald-100 border-emerald-500 text-emerald-600'
-                                : 'bg-yellow-100 border-yellow-500 text-yellow-700');
-                }
+                renderAnalysis(data, symbol, years);
             } catch (err) {
                 console.error('analyzeStock error', err);
+                const input = document.getElementById('ticker-input');
+                const yearsSelect = document.getElementById('years-select');
+                const symbol = ((input && input.value) || '').trim().toUpperCase();
+                const years = yearsSelect ? Number(yearsSelect.value) : 1;
+                const mock = MOCK_ANALYSIS?.[symbol]?.[years];
+                if (mock) {
+                    renderAnalysis(mock, symbol, years);
+                }
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             const searchBtn = document.getElementById('search-button');
+            const refreshBtn = document.getElementById('refresh-button');
             const input = document.getElementById('ticker-input');
+            const yearsSelect = document.getElementById('years-select');
             if (searchBtn) {
                 searchBtn.addEventListener('click', analyzeStock);
+            }
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', analyzeStock);
             }
             if (input) {
                 input.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') analyzeStock();
                 });
             }
+            if (yearsSelect) {
+                yearsSelect.addEventListener('change', () => {
+                    analyzeStock();
+                    renderWatchlist();
+                });
+            }
+            renderWatchlist();
+            analyzeStock();
         });
     </script>
 </body>
