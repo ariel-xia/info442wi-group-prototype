@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retail Radar - Full Prototype</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans flex h-screen overflow-hidden">
 
@@ -17,6 +18,11 @@
             <button onclick="switchView('dashboard')" id="nav-dashboard" class="w-full text-left px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-medium transition-colors">Dashboard</button>
             <button onclick="switchView('watchlist')" id="nav-watchlist" class="w-full text-left px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors">Watchlist</button>
             <button onclick="switchView('portfolio')" id="nav-portfolio" class="w-full text-left px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors">My Portfolio</button>
+            <div class="pt-4 border-t border-slate-200 mt-4 space-y-2">
+                <p class="text-[10px] font-semibold tracking-[0.16em] text-slate-400 uppercase px-2">Flows</p>
+                <button onclick="switchView('add-ticker')" id="nav-add-ticker" class="w-full text-left px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors text-sm">+ Add Ticker</button>
+                <button onclick="switchView('visualizations')" id="nav-visualizations" class="w-full text-left px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors text-sm">Visualizations</button>
+            </div>
         </nav>
         <div class="p-4 border-t border-slate-200">
             <div class="flex items-center gap-3">
@@ -115,18 +121,58 @@
 
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex-grow flex flex-col">
                         <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-lg font-bold text-slate-800">Price vs. Projection</h3>
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Price vs. Projection</h3>
+                                <p class="text-xs text-slate-500 mt-1">Primary performance chart for a single ticker.</p>
+                            </div>
                             <div class="flex gap-2">
-                                <button class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded hover:bg-slate-200">1M</button>
-                                <button class="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded shadow">3M</button>
-                                <button class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded hover:bg-slate-200">YTD</button>
+                                <button id="tf-1m" data-timeframe="1M" class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded hover:bg-slate-200">1M</button>
+                                <button id="tf-3m" data-timeframe="3M" class="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded shadow">3M</button>
+                                <button id="tf-ytd" data-timeframe="YTD" class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded hover:bg-slate-200">YTD</button>
                             </div>
                         </div>
-                        <div class="flex-grow bg-slate-50 border border-slate-100 rounded-lg min-h-[350px] flex items-center justify-center p-4">
-                            <p class="text-slate-400 font-medium text-center">
-                                React Component <code class="bg-slate-200 px-2 py-1 rounded text-slate-600">&lt;StockChart /&gt;</code> renders here.<br>
-                                <span class="text-xs mt-2 block">(Replace this div when moving to Next.js)</span>
-                            </p>
+                        <div class="flex-grow bg-slate-50 border border-slate-100 rounded-lg min-h-[350px] flex flex-col gap-4 p-4">
+                            <div class="flex-1 rounded-lg border border-slate-200 bg-white shadow-sm flex items-center justify-center px-4 py-3">
+                                <canvas id="stock-chart" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div class="rounded-lg border border-slate-200 bg-white/60 p-3 flex flex-col gap-2">
+                                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em]">Return summary</p>
+                                    <div id="return-summary-cards" class="grid grid-cols-3 gap-2 text-xs">
+                                        <div class="rounded-lg bg-slate-50 px-2.5 py-2 flex flex-col gap-1">
+                                            <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">1Y</span>
+                                            <span id="summary-1y-ret" class="text-sm font-bold text-emerald-600">—</span>
+                                            <span id="summary-1y-price" class="text-[11px] text-slate-500">Target —</span>
+                                        </div>
+                                        <div class="rounded-lg bg-slate-50 px-2.5 py-2 flex flex-col gap-1">
+                                            <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">5Y</span>
+                                            <span id="summary-5y-ret" class="text-sm font-bold text-emerald-600">—</span>
+                                            <span id="summary-5y-price" class="text-[11px] text-slate-500">Target —</span>
+                                        </div>
+                                        <div class="rounded-lg bg-slate-50 px-2.5 py-2 flex flex-col gap-1">
+                                            <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">10Y</span>
+                                            <span id="summary-10y-ret" class="text-sm font-bold text-emerald-600">—</span>
+                                            <span id="summary-10y-price" class="text-[11px] text-slate-500">Target —</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="rounded-lg border border-slate-200 bg-white/60 p-3 flex flex-col gap-2">
+                                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em]">Risk over time</p>
+                                    <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                                        <span>1Y</span>
+                                        <span>5Y</span>
+                                        <span>10Y</span>
+                                    </div>
+                                    <div class="w-full h-10 rounded-full bg-slate-100 flex items-stretch overflow-hidden">
+                                        <div id="risk-spark-low" class="flex-1 bg-emerald-200/60"></div>
+                                        <div id="risk-spark-med" class="flex-1 bg-yellow-300/70"></div>
+                                        <div id="risk-spark-high" class="flex-1 bg-red-300/70"></div>
+                                    </div>
+                                    <p id="risk-spark-caption" class="text-[11px] text-slate-500 mt-1">
+                                        Model expects medium risk across horizons.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -136,7 +182,7 @@
         <div id="view-watchlist" class="view-section hidden">
             <header class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
                 <h2 class="text-xl font-semibold text-slate-800">My Watchlist</h2>
-                <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">+ Add Ticker</button>
+                <button onclick="switchView('add-ticker')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">+ Add Ticker</button>
             </header>
 
             <div class="p-8 max-w-6xl mx-auto w-full">
@@ -192,8 +238,477 @@
                                     <td class="px-6 py-4 font-medium text-slate-900">$875.28</td>
                                     <td class="px-6 py-4 font-bold text-emerald-600">+$626.40 (16.7%)</td>
                                 </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="font-bold text-slate-900">AAPL</div>
+                                        <div class="text-xs text-slate-500">Apple Inc.</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-700">12.0</td>
+                                    <td class="px-6 py-4 text-slate-700">$210.00</td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">$257.46</td>
+                                    <td class="px-6 py-4 font-bold text-emerald-600">+$569.52 (22.6%)</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="font-bold text-slate-900">MSFT</div>
+                                        <div class="text-xs text-slate-500">Microsoft Corp.</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-700">8.0</td>
+                                    <td class="px-6 py-4 text-slate-700">$360.00</td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">$408.96</td>
+                                    <td class="px-6 py-4 font-bold text-emerald-600">+$391.68 (13.6%)</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="font-bold text-slate-900">AMZN</div>
+                                        <div class="text-xs text-slate-500">Amazon.com Inc.</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-700">6.0</td>
+                                    <td class="px-6 py-4 text-slate-700">$185.00</td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">$213.21</td>
+                                    <td class="px-6 py-4 font-bold text-emerald-600">+$169.26 (15.2%)</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="font-bold text-slate-900">TSLA</div>
+                                        <div class="text-xs text-slate-500">Tesla Inc.</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-700">4.0</td>
+                                    <td class="px-6 py-4 text-slate-700">$340.00</td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">$396.73</td>
+                                    <td class="px-6 py-4 font-bold text-red-600">-$174.92 (-11.4%)</td>
+                                </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Portfolio Performance</h3>
+                                <p class="text-xs text-slate-500 mt-1">Overall portfolio value over time.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700 uppercase tracking-[0.16em]">Portfolio Viz</span>
+                        </div>
+                        <div class="flex-1 min-h-[220px] rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center px-4 py-3">
+                            <canvas id="portfolio-performance-chart" class="w-full h-full"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Risk &amp; Diversification</h3>
+                                <p class="text-xs text-slate-500 mt-1">How concentrated the portfolio is across sectors and tickers.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 uppercase tracking-[0.16em]">Risk Viz</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="min-h-[160px] rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center px-3 py-3">
+                                <canvas id="sector-allocation-donut" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="min-h-[160px] rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center px-3 py-3">
+                                <canvas id="risk-return-scatterplot" class="w-full h-full"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-add-ticker" class="view-section hidden">
+            <header class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-800">Add a New Ticker</h2>
+                    <p class="text-xs text-slate-500 mt-1 max-w-xl">
+                        This flow guides student investors through safely adding a new stock to either their watchlist or portfolio.
+                    </p>
+                </div>
+                <button onclick="switchView('watchlist')" class="border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50">
+                    Back to Watchlist
+                </button>
+            </header>
+
+            <div class="p-8 max-w-5xl mx-auto w-full flex flex-col gap-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-6">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">Ticker &amp; Destination</h3>
+                            <p class="text-xs text-slate-500 mt-1">Search a ticker and choose whether to add it to the watchlist or portfolio.</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700 uppercase tracking-[0.16em]">Form Step 1</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-[2fr,1fr] gap-4">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 min-h-[140px] px-4 py-4 flex flex-col gap-3">
+                            <form id="add-ticker-form" class="space-y-3">
+                                <div class="flex flex-col gap-1">
+                                    <label for="add-ticker-input" class="text-xs font-semibold text-slate-600 uppercase tracking-[0.16em]">Ticker symbol</label>
+                                    <input
+                                        id="add-ticker-input"
+                                        name="symbol"
+                                        list="ticker-suggestions"
+                                        class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                        placeholder="e.g. AAPL, NVDA"
+                                    >
+                                    <datalist id="ticker-suggestions">
+                                        <option value="AAPL">
+                                        <option value="MSFT">
+                                        <option value="NVDA">
+                                        <option value="GOOGL">
+                                        <option value="AMZN">
+                                        <option value="META">
+                                        <option value="TSLA">
+                                        <option value="AMD">
+                                    </datalist>
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-xs font-semibold text-slate-600 uppercase tracking-[0.16em]">Destination</span>
+                                    <div class="flex gap-4 text-xs text-slate-700">
+                                        <label class="inline-flex items-center gap-1">
+                                            <input type="radio" name="destination" value="watchlist" checked class="text-indigo-600 focus:ring-indigo-500">
+                                            <span>Watchlist only</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-1">
+                                            <input type="radio" name="destination" value="portfolio" class="text-indigo-600 focus:ring-indigo-500">
+                                            <span>Add to portfolio</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <button type="button" id="add-ticker-cta" class="mt-1 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">
+                                    Preview impact
+                                </button>
+                            </form>
+                        </div>
+                        <div id="ticker-validation-banner" class="rounded-lg border border-slate-200 bg-white min-h-[140px] px-4 py-4 flex flex-col justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-1">Model readiness</p>
+                                <p id="validation-title" class="text-sm font-bold text-slate-800">Start by entering a ticker.</p>
+                                <p id="validation-copy" class="text-xs text-slate-500 mt-1">
+                                    We’ll check that we have enough history for this stock and estimate model confidence.
+                                </p>
+                            </div>
+                            <div class="mt-3 flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span id="validation-pill" class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                        Awaiting input
+                                    </span>
+                                    <span id="validation-confidence" class="text-[11px] text-slate-500">
+                                        —
+                                    </span>
+                                </div>
+                                <span id="validation-risk" class="text-[11px] font-semibold text-slate-500">
+                                    Risk: —
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Portfolio Settings</h3>
+                                <p class="text-xs text-slate-500 mt-1">If adding to portfolio, collect allocation and time horizon.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 uppercase tracking-[0.16em]">Form Step 2</span>
+                        </div>
+                        <div class="flex-1 min-h-[180px] rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center px-4 py-4">
+                            <div class="w-full space-y-4 text-xs text-slate-700" id="portfolio-allocation-form">
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="font-semibold uppercase tracking-[0.16em] text-[11px] text-slate-500">% of portfolio</span>
+                                        <span id="alloc-percent-value" class="font-semibold text-slate-800">5%</span>
+                                    </div>
+                                    <input id="alloc-percent" type="range" min="1" max="25" value="5" class="w-full accent-indigo-600">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="font-semibold uppercase tracking-[0.16em] text-[11px] text-slate-500">Monthly contribution</span>
+                                        <span id="alloc-monthly-value" class="font-semibold text-slate-800">$100</span>
+                                    </div>
+                                    <input id="alloc-monthly" type="range" min="25" max="400" value="100" step="25" class="w-full accent-indigo-600">
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <span class="font-semibold uppercase tracking-[0.16em] text-[11px] text-slate-500">Target horizon</span>
+                                    <select id="alloc-horizon" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="1">1 year</option>
+                                        <option value="5" selected>5 years</option>
+                                        <option value="10">10 years</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Preview Impact</h3>
+                                <p class="text-xs text-slate-500 mt-1">Show how this ticker would change risk and performance.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-yellow-50 px-3 py-1 text-[11px] font-semibold text-yellow-700 uppercase tracking-[0.16em]">Form Step 3</span>
+                        </div>
+                        <div class="flex-1 min-h-[180px] rounded-lg border border-slate-200 bg-slate-50 flex flex-col gap-3 px-4 py-3">
+                            <div class="flex-1 rounded-lg border border-slate-200 bg-white/70 flex flex-col px-3 py-3 gap-2">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em]">Mini portfolio impact</p>
+                                    <span id="delta-label" class="text-[11px] font-semibold text-emerald-600">Slightly positive</span>
+                                </div>
+                                <div class="w-full h-4 rounded-full bg-slate-100 overflow-hidden">
+                                    <div id="delta-bar" class="h-full w-1/2 bg-gradient-to-r from-slate-300 via-emerald-400 to-emerald-500"></div>
+                                </div>
+                                <p id="delta-caption" class="text-[11px] text-slate-500 mt-1">
+                                    With this allocation, projected 5Y return improves modestly while risk stays balanced.
+                                </p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-white/70 flex items-center px-3 py-2">
+                                <div class="flex flex-col gap-0.5 text-[11px] text-slate-600" id="risk-change-summary">
+                                    <span class="font-semibold uppercase tracking-[0.16em] text-slate-500">Risk change summary</span>
+                                    <span id="risk-change-line" class="text-slate-700">
+                                        No major change expected to overall portfolio risk.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<div id="view-visualizations" class="view-section hidden">
+            <header class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-800">Visualization Library</h2>
+                    <p class="text-xs text-slate-500 mt-1 max-w-2xl">
+                        Overview of all the charts and components that power Retail Radar’s dashboard, watchlist, and portfolio experiences.
+                    </p>
+                </div>
+            </header>
+
+            <div class="p-8 max-w-6xl mx-auto w-full flex flex-col gap-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Watchlist Visualizations</h3>
+                                <p class="text-xs text-slate-500 mt-1">Components that summarize many tickers at once.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700 uppercase tracking-[0.16em]">Watchlist</span>
+                        </div>
+                        <div class="flex flex-col gap-3">
+                            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em]">Watchlist heatmap (1Y expected return)</p>
+                                    <div class="text-[11px] text-slate-500 flex items-center gap-2">
+                                        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-red-300 inline-block"></span>Low</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-yellow-300 inline-block"></span>Mid</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-emerald-300 inline-block"></span>High</span>
+                                    </div>
+                                </div>
+                                <div id="viz-watchlist-heatmap" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+                                <p class="text-[11px] text-slate-500 mt-2">Click a tile to jump to Dashboard analysis.</p>
+                            </div>
+                            <div class="h-48 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-3 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Risk bands (count of tickers by risk)</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-watchlist-risk-bands" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Portfolio Visualizations</h3>
+                                <p class="text-xs text-slate-500 mt-1">Components that explain performance and diversification.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 uppercase tracking-[0.16em]">Portfolio</span>
+                        </div>
+                        <div class="flex flex-col gap-3">
+                            <div class="h-48 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-3 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Portfolio risk meter (mock)</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-portfolio-risk-meter" class="w-full h-full"></canvas>
+                                </div>
+                                <p id="viz-portfolio-risk-caption" class="text-[11px] text-slate-500 mt-2 text-center shrink-0">Overall risk: —</p>
+                            </div>
+                            <div class="h-48 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-3 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Contribution timeline (monthly)</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-contribution-timeline" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">Educational Overlays</h3>
+                            <p class="text-xs text-slate-500 mt-1">Visual helpers that explain what the model is doing for new investors.</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-yellow-50 px-3 py-1 text-[11px] font-semibold text-yellow-700 uppercase tracking-[0.16em]">Guidance</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="min-h-[120px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 flex flex-col justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2">Model confidence tooltip</p>
+                                <p class="text-xs text-slate-600 leading-relaxed">
+                                    Hover the pill to see a tooltip explanation of the model’s confidence score.
+                                </p>
+                            </div>
+                            <div class="mt-3">
+                                <span id="viz-confidence-pill" class="relative inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700" tabindex="0">
+                                    Confidence: 58%
+                                    <span id="viz-confidence-tooltip" class="hidden absolute left-0 top-full mt-2 w-56 rounded-lg border border-slate-200 bg-white p-2 text-[11px] font-medium text-slate-600 shadow-lg z-20">
+                                        Confidence reflects data coverage and stability. Higher confidence means the model has more consistent patterns to learn from.
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="min-h-[120px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 flex flex-col justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2">Risk legend overlay</p>
+                                <p class="text-xs text-slate-600 leading-relaxed">
+                                    Click to toggle a legend explaining Low / Medium / High risk colors.
+                                </p>
+                            </div>
+                            <div class="mt-3 flex items-center gap-2">
+                                <button id="viz-toggle-risk-legend" type="button" class="rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-slate-800">
+                                    Toggle legend
+                                </button>
+                                <div id="viz-risk-legend" class="hidden rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600">
+                                    <span class="inline-flex items-center gap-1 mr-2"><span class="w-2 h-2 rounded bg-emerald-400"></span>Low</span>
+                                    <span class="inline-flex items-center gap-1 mr-2"><span class="w-2 h-2 rounded bg-yellow-400"></span>Medium</span>
+                                    <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded bg-red-400"></span>High</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="min-h-[120px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 flex flex-col justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2">First-time user tour</p>
+                                <p class="text-xs text-slate-600 leading-relaxed">
+                                    A lightweight modal that explains the 3 core actions in Retail Radar.
+                                </p>
+                            </div>
+                            <div class="mt-3">
+                                <button id="viz-start-tour" type="button" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700">
+                                    Start tour
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Single-ticker deep dives</h3>
+                                <p class="text-xs text-slate-500 mt-1">Charts tied to the dashboard stock evaluation flow.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700 uppercase tracking-[0.16em]">Dashboard</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div class="h-64 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-4 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Forecast Cone</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-forecast-cone" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                            <div class="h-64 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-4 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Volatility Histogram</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-volatility-hist" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                            <div class="h-56 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-4 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Beta Comparison</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-beta-bar" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Comparative &amp; time series</h3>
+                                <p class="text-xs text-slate-500 mt-1">Side-by-side and historical context.</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-[11px] font-semibold text-violet-700 uppercase tracking-[0.16em]">Compare</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div class="h-64 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-4 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Peer Comparison Radar</p>
+                                <div class="flex-1 relative flex items-center justify-center min-h-0">
+                                    <canvas id="viz-peer-radar" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                            <div class="h-64 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-4 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Horizon Return Waterfall</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-horizon-waterfall" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                            <div class="h-56 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-4 py-3">
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 shrink-0">Drawdown Area Chart</p>
+                                <div class="flex-1 relative min-h-0">
+                                    <canvas id="viz-drawdown-area" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">Watchlist &amp; portfolio extras</h3>
+                            <p class="text-xs text-slate-500 mt-1">More slots for list and allocation views.</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600 uppercase tracking-[0.16em]">More</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="h-48 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-3 py-3">
+                            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 text-center shrink-0">Watchlist Sort</p>
+                            <div class="flex-1 w-full overflow-y-auto min-h-0 flex items-center justify-center">
+                                <table class="w-full text-left text-[11px]">
+                                    <tr class="text-slate-400 border-b border-slate-200"><th class="pb-1">Ticker</th><th class="pb-1">Exp Ret</th></tr>
+                                    <tr><td class="font-bold py-1">NVDA</td><td class="text-emerald-600 py-1">+16.7%</td></tr>
+                                    <tr><td class="font-bold py-1">MSFT</td><td class="text-emerald-600 py-1">+13.6%</td></tr>
+                                    <tr><td class="font-bold py-1">TSLA</td><td class="text-red-600 py-1">-11.4%</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="h-48 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-3 py-3">
+                            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 text-center shrink-0">Correlation</p>
+                            <div class="flex-1 w-full flex items-center justify-center min-h-0">
+                                <div class="grid grid-cols-3 gap-1 w-full h-full p-2">
+                                    <div class="bg-emerald-500 rounded-sm"></div><div class="bg-emerald-200 rounded-sm"></div><div class="bg-slate-200 rounded-sm"></div>
+                                    <div class="bg-emerald-200 rounded-sm"></div><div class="bg-emerald-500 rounded-sm"></div><div class="bg-red-200 rounded-sm"></div>
+                                    <div class="bg-slate-200 rounded-sm"></div><div class="bg-red-200 rounded-sm"></div><div class="bg-emerald-500 rounded-sm"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="h-48 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-3 py-3">
+                            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 text-center shrink-0">Rolling Returns</p>
+                            <div class="flex-1 relative min-h-0">
+                                <canvas id="viz-rolling-returns" class="w-full h-full"></canvas>
+                            </div>
+                        </div>
+                        <div class="h-48 rounded-lg border border-slate-200 bg-slate-50 flex flex-col px-3 py-3">
+                            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.16em] mb-2 text-center shrink-0">Alloc Treemap</p>
+                            <div class="flex-1 relative min-h-0">
+                                <canvas id="viz-alloc-treemap" class="w-full h-full"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -221,6 +736,712 @@
             const pp = Number(predictedPrice);
             if (!Number.isFinite(cp) || !Number.isFinite(pp) || cp === 0) return null;
             return (pp - cp) / cp * 100;
+        }
+
+        // --- Chart.js helpers ---
+        let stockChartInstance = null;
+        let portfolioChartInstance = null;
+        let sectorDonutInstance = null;
+        let riskReturnScatterInstance = null;
+
+        // New Library visualization instances
+        let vizForecastConeInstance = null;
+        let vizVolatilityHistInstance = null;
+        let vizBetaBarInstance = null;
+        let vizPeerRadarInstance = null;
+        let vizHorizonWaterfallInstance = null;
+        let vizDrawdownAreaInstance = null;
+        let vizRollingReturnsInstance = null;
+        let vizAllocTreemapInstance = null;
+
+        let currentTimeframe = '3M';
+        let lastAnalysisPayload = null;
+
+        function getOrCreateCtx(id) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return null;
+            return canvas.getContext('2d');
+        }
+
+        function renderStockChartFromAnalysis(data, years) {
+            if (typeof Chart === 'undefined') return;
+            const ctx = getOrCreateCtx('stock-chart');
+            if (!ctx) return;
+
+            const pp = data?.predicted_price || {};
+            const currentPrice = data?.current_price ?? pp?.current_price;
+            const predicted = pp?.value;
+            if (currentPrice == null || predicted == null) return;
+
+            const horizonYears = years ?? pp?.years ?? 1;
+
+            let labels;
+            let baseSeries;
+            switch (currentTimeframe) {
+                case '1M':
+                    labels = ['-4W', '-3W', '-2W', '-1W', 'Now'];
+                    baseSeries = [currentPrice * 0.96, currentPrice * 0.98, currentPrice, currentPrice * 1.01, currentPrice * 1.015];
+                    break;
+                case 'YTD':
+                    labels = ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Now'];
+                    baseSeries = [currentPrice * 0.9, currentPrice * 0.93, currentPrice * 0.97, currentPrice, currentPrice * 1.03, currentPrice * 1.06];
+                    break;
+                case '3M':
+                default:
+                    labels = ['-3M', '-2M', '-1M', 'Now', `+${horizonYears}Y`];
+                    baseSeries = [currentPrice * 0.94, currentPrice * 0.97, currentPrice, currentPrice * 1.03, currentPrice * 1.06];
+                    break;
+            }
+
+            const projSeries = baseSeries.map((v, idx) => {
+                if (idx === baseSeries.length - 1) {
+                    return predicted;
+                }
+                const w = idx / (baseSeries.length - 1);
+                return v + w * (predicted - currentPrice) * 0.4;
+            });
+
+            if (stockChartInstance) {
+                stockChartInstance.destroy();
+            }
+            stockChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Historical (mock)',
+                            data: baseSeries,
+                            borderColor: '#94a3b8',
+                            backgroundColor: 'rgba(148,163,184,0.12)',
+                            tension: 0.35,
+                            fill: true,
+                        },
+                        {
+                            label: 'Model Projection',
+                            data: projSeries,
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79,70,229,0.12)',
+                            tension: 0.35,
+                            fill: false,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { boxWidth: 12, boxHeight: 2 },
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label(ctx) {
+                                    return `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`;
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 5 },
+                            grid: { display: false },
+                        },
+                        y: {
+                            ticks: { callback: v => `$${v}` },
+                            grid: { color: 'rgba(148,163,184,0.25)' },
+                        },
+                    },
+                },
+            });
+        }
+
+        function renderPortfolioPerformanceChart() {
+            if (typeof Chart === 'undefined') return;
+            const ctx = getOrCreateCtx('portfolio-performance-chart');
+            if (!ctx) return;
+
+            if (portfolioChartInstance) {
+                portfolioChartInstance.destroy();
+            }
+
+            const labels = ['-12M', '-9M', '-6M', '-3M', 'Now'];
+            const values = [7800, 9200, 10400, 11800, 12450];
+
+            portfolioChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Portfolio value',
+                            data: values,
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79,70,229,0.15)',
+                            tension: 0.35,
+                            fill: true,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label(ctx) {
+                                    return `$${ctx.parsed.y.toLocaleString()}`;
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                            grid: { color: 'rgba(148,163,184,0.25)' },
+                            ticks: {
+                                callback(v) {
+                                    return `$${Number(v).toLocaleString()}`;
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+        }
+
+        function renderSectorAllocationDonut() {
+            if (typeof Chart === 'undefined') return;
+            const ctx = getOrCreateCtx('sector-allocation-donut');
+            if (!ctx) return;
+
+            if (sectorDonutInstance) {
+                sectorDonutInstance.destroy();
+            }
+
+            const labels = ['AI & Chips', 'Cloud & SaaS', 'Consumer Tech', 'Auto & Energy'];
+            const values = [45, 25, 20, 10];
+
+            sectorDonutInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            data: values,
+                            backgroundColor: ['#4f46e5', '#22c55e', '#0ea5e9', '#f97316'],
+                            borderColor: '#ffffff',
+                            borderWidth: 2,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 10 },
+                        },
+                    },
+                    cutout: '60%',
+                },
+            });
+        }
+
+        function renderRiskReturnScatterplot() {
+            if (typeof Chart === 'undefined') return;
+            const ctx = getOrCreateCtx('risk-return-scatterplot');
+            if (!ctx) return;
+
+            if (riskReturnScatterInstance) {
+                riskReturnScatterInstance.destroy();
+            }
+
+            const years = 5;
+            const encodeRisk = level => {
+                const l = String(level || '').toLowerCase();
+                if (l.startsWith('l')) return 1;
+                if (l.startsWith('m')) return 2;
+                if (l.startsWith('h')) return 3;
+                return 0;
+            };
+
+            const tickers = Object.keys(MOCK_ANALYSIS || {});
+            const points = tickers.map(symbol => {
+                const entry = MOCK_ANALYSIS?.[symbol]?.[years];
+                if (!entry) return null;
+                const ret = computeExpectedReturnPct(entry.current_price, entry.predicted_price?.value);
+                const riskLevel = entry.risk?.level || 'Unknown';
+                return {
+                    x: encodeRisk(riskLevel),
+                    y: ret ?? 0,
+                    symbol,
+                    risk: riskLevel,
+                };
+            }).filter(Boolean);
+
+            riskReturnScatterInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Tickers',
+                            data: points.map(p => ({ x: p.x, y: p.y, symbol: p.symbol, risk: p.risk })),
+                            backgroundColor: '#4f46e5',
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label(ctx) {
+                                    const raw = ctx.raw || {};
+                                    const name = raw.symbol || '';
+                                    const risk = raw.risk || '';
+                                    return `${name} – ${risk} • ${ctx.parsed.y.toFixed(1)}%`;
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            min: 0.5,
+                            max: 3.5,
+                            ticks: {
+                                callback(v) {
+                                    if (v === 1) return 'Low';
+                                    if (v === 2) return 'Medium';
+                                    if (v === 3) return 'High';
+                                    return '';
+                                },
+                            },
+                            title: { display: true, text: 'Risk level' },
+                            grid: { display: false },
+                        },
+                        y: {
+                            title: { display: true, text: 'Expected 5Y return (%)' },
+                            grid: { color: 'rgba(148,163,184,0.25)' },
+                        },
+                    },
+                },
+            });
+        }
+
+        // --- Visualization Library renderers (render on-demand when tab is visible) ---
+        let vizRiskBandsInstance = null;
+        let vizPortfolioRiskMeterInstance = null;
+        let vizContributionTimelineInstance = null;
+        let vizLibraryInitialized = false;
+
+        function renderVizWatchlistHeatmap() {
+            const el = document.getElementById('viz-watchlist-heatmap');
+            if (!el) return;
+            const years = 1;
+            const tiles = (WATCHLIST || []).map(({ symbol }) => {
+                const entry = MOCK_ANALYSIS?.[symbol]?.[years] || MOCK_ANALYSIS?.[symbol]?.[1];
+                const ret = entry ? computeExpectedReturnPct(entry.current_price, entry.predicted_price?.value) : null;
+                let bg = 'bg-slate-200';
+                if (ret != null) {
+                    if (ret < 0) bg = 'bg-red-300';
+                    else if (ret < 6) bg = 'bg-yellow-300';
+                    else bg = 'bg-emerald-300';
+                }
+                const retText = ret == null ? '—' : `${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%`;
+                return `
+                    <button type="button"
+                        class="rounded-lg ${bg} px-2.5 py-2 text-left hover:brightness-95 transition"
+                        onclick="setInputAndAnalyze('${symbol}')"
+                        title="Click to analyze ${symbol}">
+                        <div class="text-xs font-extrabold text-slate-900">${symbol}</div>
+                        <div class="text-[11px] font-semibold text-slate-800/80">${retText}</div>
+                    </button>
+                `;
+            });
+            el.innerHTML = tiles.join('');
+        }
+
+        function renderVizWatchlistRiskBands() {
+            if (typeof Chart === 'undefined') return;
+            const ctx = getOrCreateCtx('viz-watchlist-risk-bands');
+            if (!ctx) return;
+            if (vizRiskBandsInstance) vizRiskBandsInstance.destroy();
+
+            const years = 1;
+            const counts = { Low: 0, Medium: 0, High: 0 };
+            (WATCHLIST || []).forEach(({ symbol }) => {
+                const level = (MOCK_ANALYSIS?.[symbol]?.[years]?.risk?.level || MOCK_ANALYSIS?.[symbol]?.[1]?.risk?.level || 'Medium');
+                const key = String(level).toLowerCase().startsWith('l') ? 'Low' : String(level).toLowerCase().startsWith('h') ? 'High' : 'Medium';
+                counts[key] += 1;
+            });
+
+            vizRiskBandsInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Low', 'Medium', 'High'],
+                    datasets: [
+                        {
+                            data: [counts.Low, counts.Medium, counts.High],
+                            backgroundColor: ['#34d399', '#fbbf24', '#fb7185'],
+                            borderRadius: 8,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(148,163,184,0.25)' } },
+                    },
+                },
+            });
+        }
+
+        function renderVizPortfolioRiskMeter() {
+            if (typeof Chart === 'undefined') return;
+            const ctx = getOrCreateCtx('viz-portfolio-risk-meter');
+            if (!ctx) return;
+            if (vizPortfolioRiskMeterInstance) vizPortfolioRiskMeterInstance.destroy();
+
+            // Mock score (0–100).
+            const score = 58;
+            vizPortfolioRiskMeterInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [
+                        {
+                            data: [score, 100 - score],
+                            backgroundColor: ['#4f46e5', 'rgba(148,163,184,0.25)'],
+                            borderWidth: 0,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    cutout: '70%',
+                    rotation: -90,
+                    circumference: 180,
+                },
+            });
+
+            const cap = document.getElementById('viz-portfolio-risk-caption');
+            if (cap) cap.textContent = score < 40 ? 'Overall risk: Low' : score < 70 ? 'Overall risk: Medium' : 'Overall risk: High';
+        }
+
+        function renderVizContributionTimeline() {
+            if (typeof Chart === 'undefined') return;
+            const ctx = getOrCreateCtx('viz-contribution-timeline');
+            if (!ctx) return;
+            if (vizContributionTimelineInstance) vizContributionTimelineInstance.destroy();
+
+            vizContributionTimelineInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
+                    datasets: [
+                        {
+                            data: [100, 125, 100, 150, 150, 175],
+                            backgroundColor: 'rgba(79,70,229,0.35)',
+                            borderColor: '#4f46e5',
+                            borderWidth: 1,
+                            borderRadius: 8,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.25)' }, ticks: { callback: v => `$${v}` } },
+                    },
+                },
+            });
+        }
+
+        // Newly added visualizations 
+        function renderVizForecastCone() {
+            const ctx = getOrCreateCtx('viz-forecast-cone');
+            if (!ctx) return;
+            if (vizForecastConeInstance) vizForecastConeInstance.destroy();
+
+            vizForecastConeInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                    datasets: [
+                        {
+                            label: 'Upper Bound',
+                            data: [100, 120, 135, 155],
+                            borderColor: 'transparent',
+                            backgroundColor: 'rgba(79,70,229,0.1)',
+                            fill: '+1',
+                            tension: 0.4,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Expected',
+                            data: [100, 110, 118, 125],
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Lower Bound',
+                            data: [100, 95, 90, 85],
+                            borderColor: 'transparent',
+                            backgroundColor: 'rgba(79,70,229,0.1)',
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: true, grid: { display: false } }, y: { display: true, grid: { color: 'rgba(148,163,184,0.2)' } } }
+                }
+            });
+        }
+
+        function renderVizVolatilityHist() {
+            const ctx = getOrCreateCtx('viz-volatility-hist');
+            if (!ctx) return;
+            if (vizVolatilityHistInstance) vizVolatilityHistInstance.destroy();
+
+            vizVolatilityHistInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['-5%', '-3%', '-1%', '1%', '3%', '5%'],
+                    datasets: [
+                        { label: 'Ticker', data: [2, 12, 35, 30, 15, 6], backgroundColor: '#4f46e5', borderRadius: 4 },
+                        { label: 'S&P 500', data: [0, 5, 45, 40, 8, 2], backgroundColor: '#cbd5e1', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { grid: { display: false } }, y: { display: false } }
+                }
+            });
+        }
+
+        function renderVizBetaBar() {
+            const ctx = getOrCreateCtx('viz-beta-bar');
+            if (!ctx) return;
+            if (vizBetaBarInstance) vizBetaBarInstance.destroy();
+
+            vizBetaBarInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['AAPL', 'Tech Avg', 'S&P 500'],
+                    datasets: [{
+                        data: [1.3, 1.15, 1.0],
+                        backgroundColor: ['#4f46e5', '#94a3b8', '#cbd5e1'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.2)' } }, y: { grid: { display: false } } }
+                }
+            });
+        }
+
+        function renderVizPeerRadar() {
+            const ctx = getOrCreateCtx('viz-peer-radar');
+            if (!ctx) return;
+            if (vizPeerRadarInstance) vizPeerRadarInstance.destroy();
+
+            vizPeerRadarInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Value', 'Growth', 'Profit', 'Momentum', 'Quality'],
+                    datasets: [
+                        { label: 'Ticker', data: [80, 65, 90, 75, 85], backgroundColor: 'rgba(79,70,229,0.2)', borderColor: '#4f46e5', borderWidth: 2 },
+                        { label: 'Peer Avg', data: [60, 70, 60, 60, 65], backgroundColor: 'rgba(148,163,184,0.2)', borderColor: '#94a3b8', borderWidth: 2 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { r: { ticks: { display: false } } }
+                }
+            });
+        }
+
+        function renderVizHorizonWaterfall() {
+            const ctx = getOrCreateCtx('viz-horizon-waterfall');
+            if (!ctx) return;
+            if (vizHorizonWaterfallInstance) vizHorizonWaterfallInstance.destroy();
+
+            vizHorizonWaterfallInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Current', '1Y', '5Y', '10Y'],
+                    datasets: [{
+                        data: [100, 115, 150, 220],
+                        backgroundColor: ['#cbd5e1', '#34d399', '#10b981', '#059669'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(148,163,184,0.2)' } } }
+                }
+            });
+        }
+
+        function renderVizDrawdownArea() {
+            const ctx = getOrCreateCtx('viz-drawdown-area');
+            if (!ctx) return;
+            if (vizDrawdownAreaInstance) vizDrawdownAreaInstance.destroy();
+
+            vizDrawdownAreaInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Drawdown',
+                        data: [0, -2, -15, -8, -1, 0],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239,68,68,0.2)',
+                        fill: 'origin',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { grid: { display: false } }, y: { max: 0, grid: { color: 'rgba(148,163,184,0.2)' } } }
+                }
+            });
+        }
+
+        function renderVizRollingReturns() {
+            const ctx = getOrCreateCtx('viz-rolling-returns');
+            if (!ctx) return;
+            if (vizRollingReturnsInstance) vizRollingReturnsInstance.destroy();
+
+            vizRollingReturnsInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Y1', 'Y2', 'Y3', 'Y4', 'Y5'],
+                    datasets: [{
+                        data: [5, -2, 8, 12, -4],
+                        backgroundColor: (ctx) => ctx.raw >= 0 ? '#10b981' : '#ef4444',
+                        borderRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        }
+
+        function renderVizAllocTreemap() {
+            const ctx = getOrCreateCtx('viz-alloc-treemap');
+            if (!ctx) return;
+            if (vizAllocTreemapInstance) vizAllocTreemapInstance.destroy();
+
+            // Using doughnut as a stand-in for Treemap since standard Chart.js lacks native treemaps
+            vizAllocTreemapInstance = new Chart(ctx, {
+                type: 'pie', 
+                data: {
+                    labels: ['NVDA', 'AAPL', 'MSFT', 'AMZN'],
+                    datasets: [{
+                        data: [35, 25, 20, 20],
+                        backgroundColor: ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function initVizEducationalOverlays() {
+            if (vizLibraryInitialized) return;
+            vizLibraryInitialized = true;
+
+            const pill = document.getElementById('viz-confidence-pill');
+            const tip = document.getElementById('viz-confidence-tooltip');
+            if (pill && tip) {
+                const show = () => tip.classList.remove('hidden');
+                const hide = () => tip.classList.add('hidden');
+                pill.addEventListener('mouseenter', show);
+                pill.addEventListener('mouseleave', hide);
+                pill.addEventListener('focus', show);
+                pill.addEventListener('blur', hide);
+            }
+
+            const toggleLegendBtn = document.getElementById('viz-toggle-risk-legend');
+            const legend = document.getElementById('viz-risk-legend');
+            if (toggleLegendBtn && legend) {
+                toggleLegendBtn.addEventListener('click', () => legend.classList.toggle('hidden'));
+            }
+
+            const startTour = document.getElementById('viz-start-tour');
+            if (startTour) {
+                startTour.addEventListener('click', () => {
+                    alert('Tour:\n1) Analyze a ticker on Dashboard\n2) Compare tickers in Watchlist\n3) Track performance in Portfolio');
+                });
+            }
+        }
+
+        function renderVisualizationsTab() {
+            // Render basic layouts
+            renderVizWatchlistHeatmap();
+            renderVizWatchlistRiskBands();
+            renderVizPortfolioRiskMeter();
+            renderVizContributionTimeline();
+            
+            // Render newly added charts
+            renderVizForecastCone();
+            renderVizVolatilityHist();
+            renderVizBetaBar();
+            renderVizPeerRadar();
+            renderVizHorizonWaterfall();
+            renderVizDrawdownArea();
+            renderVizRollingReturns();
+            renderVizAllocTreemap();
+
+            initVizEducationalOverlays();
+
+            // Ensure canvases resize correctly after layout
+            setTimeout(() => {
+                try { vizRiskBandsInstance?.resize(); } catch {}
+                try { vizPortfolioRiskMeterInstance?.resize(); } catch {}
+                try { vizContributionTimelineInstance?.resize(); } catch {}
+                try { vizForecastConeInstance?.resize(); } catch {}
+                try { vizVolatilityHistInstance?.resize(); } catch {}
+                try { vizBetaBarInstance?.resize(); } catch {}
+                try { vizPeerRadarInstance?.resize(); } catch {}
+                try { vizHorizonWaterfallInstance?.resize(); } catch {}
+                try { vizDrawdownAreaInstance?.resize(); } catch {}
+                try { vizRollingReturnsInstance?.resize(); } catch {}
+                try { vizAllocTreemapInstance?.resize(); } catch {}
+            }, 0);
         }
 
         function renderAnalysis(data, fallbackSymbol, fallbackYears) {
@@ -276,6 +1497,54 @@
             }
 
             setLastUpdated(Date.now());
+
+            // Cache for interactions (timeframe, add-ticker flow, etc.)
+            lastAnalysisPayload = {
+                symbol,
+                current_price: currentPrice,
+                predicted_price: { value: pp?.value, years, current_price: currentPrice },
+                risk,
+            };
+
+            // Update main stock chart when analysis changes
+            try {
+                renderStockChartFromAnalysis(lastAnalysisPayload, years);
+            } catch (e) {
+                console.warn('renderStockChartFromAnalysis failed', e);
+            }
+
+            // Populate return summary cards with 1Y/5Y/10Y views if available
+            try {
+                const horizons = [1, 5, 10];
+                horizons.forEach(h => {
+                    const entry = MOCK_ANALYSIS?.[symbol]?.[h];
+                    const retEl = document.getElementById(`summary-${h}y-ret`);
+                    const priceEl = document.getElementById(`summary-${h}y-price`);
+                    if (!retEl || !priceEl || !entry) return;
+                    const r = computeExpectedReturnPct(entry.current_price, entry.predicted_price?.value);
+                    if (r == null) {
+                        retEl.textContent = '—';
+                        priceEl.textContent = 'Target —';
+                        return;
+                    }
+                    const sign = r >= 0 ? '+' : '';
+                    retEl.textContent = `${sign}${r.toFixed(1)}%`;
+                    retEl.classList.toggle('text-emerald-600', r >= 0);
+                    retEl.classList.toggle('text-red-600', r < 0);
+                    priceEl.textContent = `Target $${Number(entry.predicted_price?.value).toFixed(2)}`;
+                });
+            } catch {}
+
+            // Simple risk timeline caption based on horizon risk levels
+            try {
+                const r1 = MOCK_ANALYSIS?.[symbol]?.[1]?.risk?.level || risk?.level;
+                const r5 = MOCK_ANALYSIS?.[symbol]?.[5]?.risk?.level || risk?.level;
+                const r10 = MOCK_ANALYSIS?.[symbol]?.[10]?.risk?.level || risk?.level;
+                const captionEl = document.getElementById('risk-spark-caption');
+                if (captionEl) {
+                    captionEl.textContent = `1Y: ${r1 || '—'} • 5Y: ${r5 || '—'} • 10Y: ${r10 || '—'}`;
+                }
+            } catch {}
         }
 
         const MOCK_ANALYSIS = {
@@ -289,50 +1558,50 @@
                 5: {
                     symbol: 'AAPL',
                     current_price: 257.46,
-                    predicted_price: { value: 72.16, years: 5, current_price: 257.46 },
+                    predicted_price: { value: 340.15, years: 5, current_price: 257.46 },
                     risk: { level: 'Medium', confidence: 0.54 },
                 },
                 10: {
                     symbol: 'AAPL',
                     current_price: 257.46,
-                    predicted_price: { value: 20.21, years: 10, current_price: 257.46 },
+                    predicted_price: { value: 485.90, years: 10, current_price: 257.46 },
                     risk: { level: 'Medium', confidence: 0.545 },
                 },
             },
             MSFT: {
                 1: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 453.21, years: 1, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.505 } },
-                5: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 83.52, years: 5, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.525 } },
-                10: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 17.0, years: 10, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.525 } },
+                5: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 560.40, years: 5, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.525 } },
+                10: { symbol: 'MSFT', current_price: 408.96, predicted_price: { value: 785.80, years: 10, current_price: 408.96 }, risk: { level: 'Medium', confidence: 0.525 } },
             },
             NVDA: {
                 1: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 231.42, years: 1, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.545 } },
-                5: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 100.03, years: 5, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.4 } },
-                10: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 45.41, years: 10, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.4 } },
+                5: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 320.10, years: 5, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.4 } },
+                10: { symbol: 'NVDA', current_price: 177.82, predicted_price: { value: 520.60, years: 10, current_price: 177.82 }, risk: { level: 'Medium', confidence: 0.4 } },
             },
             GOOGL: {
                 1: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 334.29, years: 1, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.665 } },
-                5: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 38.52, years: 5, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.5 } },
-                10: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 4.96, years: 10, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.49 } },
+                5: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 420.25, years: 5, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.5 } },
+                10: { symbol: 'GOOGL', current_price: 298.52, predicted_price: { value: 610.40, years: 10, current_price: 298.52 }, risk: { level: 'Medium', confidence: 0.49 } },
             },
             AMZN: {
                 1: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 222.81, years: 1, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.525 } },
-                5: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 52.63, years: 5, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.42 } },
-                10: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 12.99, years: 10, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.42 } },
+                5: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 320.80, years: 5, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.42 } },
+                10: { symbol: 'AMZN', current_price: 213.21, predicted_price: { value: 480.15, years: 10, current_price: 213.21 }, risk: { level: 'Medium', confidence: 0.42 } },
             },
             META: {
                 1: { symbol: 'META', current_price: 644.86, predicted_price: { value: 707.0, years: 1, current_price: 644.86 }, risk: { level: 'Medium', confidence: 0.575 } },
-                5: { symbol: 'META', current_price: 644.86, predicted_price: { value: 20.15, years: 5, current_price: 644.86 }, risk: { level: 'Low', confidence: 0.485 } },
-                10: { symbol: 'META', current_price: 644.86, predicted_price: { value: 0.63, years: 10, current_price: 644.86 }, risk: { level: 'Low', confidence: 0.495 } },
+                5: { symbol: 'META', current_price: 644.86, predicted_price: { value: 905.30, years: 5, current_price: 644.86 }, risk: { level: 'Low', confidence: 0.485 } },
+                10: { symbol: 'META', current_price: 644.86, predicted_price: { value: 1250.70, years: 10, current_price: 644.86 }, risk: { level: 'Low', confidence: 0.495 } },
             },
             TSLA: {
                 1: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 452.81, years: 1, current_price: 396.73 }, risk: { level: 'Low', confidence: 0.405 } },
-                5: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 12.53, years: 5, current_price: 396.73 }, risk: { level: 'High', confidence: 0.475 } },
-                10: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 0.4, years: 10, current_price: 396.73 }, risk: { level: 'High', confidence: 0.475 } },
+                5: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 520.90, years: 5, current_price: 396.73 }, risk: { level: 'High', confidence: 0.475 } },
+                10: { symbol: 'TSLA', current_price: 396.73, predicted_price: { value: 720.25, years: 10, current_price: 396.73 }, risk: { level: 'High', confidence: 0.475 } },
             },
             AMD: {
                 1: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 201.46, years: 1, current_price: 192.43 }, risk: { level: 'High', confidence: 0.395 } },
-                5: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 6.01, years: 5, current_price: 192.43 }, risk: { level: 'Low', confidence: 0.505 } },
-                10: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 0.19, years: 10, current_price: 192.43 }, risk: { level: 'Low', confidence: 0.505 } },
+                5: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 280.60, years: 5, current_price: 192.43 }, risk: { level: 'Low', confidence: 0.505 } },
+                10: { symbol: 'AMD', current_price: 192.43, predicted_price: { value: 420.10, years: 10, current_price: 192.43 }, risk: { level: 'Low', confidence: 0.505 } },
             },
         };
 
@@ -422,20 +1691,35 @@
                 view.classList.remove('block');
             });
 
+            // Base classes — Flows nav items use text-sm in markup; keep it so size doesn't jump on switch
+            const navInactiveBase = 'w-full text-left px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors';
+            const navActiveBase = 'w-full text-left px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-medium transition-colors';
+            const navButtonsWithTextSm = ['nav-add-ticker', 'nav-visualizations'];
+
             // Reset all nav buttons to the inactive style
-            const navButtons = ['nav-dashboard', 'nav-watchlist', 'nav-portfolio'];
+            const navButtons = ['nav-dashboard', 'nav-watchlist', 'nav-portfolio', 'nav-add-ticker', 'nav-visualizations'];
             navButtons.forEach(btnId => {
                 const btn = document.getElementById(btnId);
-                btn.className = 'w-full text-left px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors';
+                if (!btn) return;
+                btn.className = navInactiveBase + (navButtonsWithTextSm.includes(btnId) ? ' text-sm' : '');
             });
 
             // Show the target view
-            document.getElementById('view-' + targetView).classList.remove('hidden');
-            document.getElementById('view-' + targetView).classList.add('block');
+            const targetEl = document.getElementById('view-' + targetView);
+            if (targetEl) {
+                targetEl.classList.remove('hidden');
+                targetEl.classList.add('block');
+            }
 
-            // Set the clicked nav button to the active style
+            // Set the clicked nav button to the active style (if a matching nav exists)
             const activeBtn = document.getElementById('nav-' + targetView);
-            activeBtn.className = 'w-full text-left px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-medium transition-colors';
+            if (activeBtn) {
+                activeBtn.className = navActiveBase + (navButtonsWithTextSm.includes(activeBtn.id) ? ' text-sm' : '');
+            }
+
+            if (targetView === 'visualizations') {
+                renderVisualizationsTab();
+            }
         }
 
         async function analyzeStock() {
@@ -503,7 +1787,161 @@
                     renderWatchlist();
                 });
             }
+            // Timeframe buttons for main chart
+            ['tf-1m', 'tf-3m', 'tf-ytd'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.addEventListener('click', () => {
+                    const tf = btn.dataset.timeframe || '3M';
+                    currentTimeframe = tf;
+                    // Toggle styles
+                    ['tf-1m', 'tf-3m', 'tf-ytd'].forEach(otherId => {
+                        const other = document.getElementById(otherId);
+                        if (!other) return;
+                        const active = otherId === id;
+                        other.className =
+                            'px-3 py-1 text-xs font-medium rounded ' +
+                            (active
+                                ? 'bg-indigo-600 text-white shadow'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200');
+                    });
+                    if (lastAnalysisPayload) {
+                        renderStockChartFromAnalysis(lastAnalysisPayload, lastAnalysisPayload?.predicted_price?.years);
+                    }
+                });
+            });
+
+            // Add-ticker flow wiring
+            const addSymbolInput = document.getElementById('add-ticker-input');
+            const addCta = document.getElementById('add-ticker-cta');
+            const allocPercent = document.getElementById('alloc-percent');
+            const allocMonthly = document.getElementById('alloc-monthly');
+            const allocHorizon = document.getElementById('alloc-horizon');
+
+            function updateAllocLabels() {
+                const p = document.getElementById('alloc-percent-value');
+                const m = document.getElementById('alloc-monthly-value');
+                if (p && allocPercent) p.textContent = `${allocPercent.value}%`;
+                if (m && allocMonthly) m.textContent = `$${allocMonthly.value}`;
+            }
+
+            function updateValidationAndDelta() {
+                const symbol = (addSymbolInput?.value || '').trim().toUpperCase();
+                const dest = (document.querySelector('input[name="destination"]:checked') || {}).value || 'watchlist';
+                const bannerTitle = document.getElementById('validation-title');
+                const bannerCopy = document.getElementById('validation-copy');
+                const bannerPill = document.getElementById('validation-pill');
+                const bannerConf = document.getElementById('validation-confidence');
+                const bannerRisk = document.getElementById('validation-risk');
+
+                if (!symbol) {
+                    if (bannerTitle) bannerTitle.textContent = 'Start by entering a ticker.';
+                    if (bannerCopy) bannerCopy.textContent = 'We’ll check that we have enough history for this stock and estimate model confidence.';
+                    if (bannerPill) {
+                        bannerPill.textContent = 'Awaiting input';
+                        bannerPill.className = 'inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600';
+                    }
+                    if (bannerConf) bannerConf.textContent = '—';
+                    if (bannerRisk) bannerRisk.textContent = 'Risk: —';
+                    return;
+                }
+
+                const years = Number(allocHorizon?.value || 5);
+                const entry = MOCK_ANALYSIS?.[symbol]?.[years] || MOCK_ANALYSIS?.[symbol]?.[1];
+                if (!entry) {
+                    if (bannerTitle) bannerTitle.textContent = `${symbol} not found in mock data.`;
+                    if (bannerCopy) bannerCopy.textContent = 'For the prototype, try one of the major tech tickers in the suggestions list.';
+                    if (bannerPill) {
+                        bannerPill.textContent = 'Unavailable';
+                        bannerPill.className = 'inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700';
+                    }
+                    if (bannerConf) bannerConf.textContent = 'Model confidence: —';
+                    if (bannerRisk) bannerRisk.textContent = 'Risk: —';
+                    return;
+                }
+
+                const confidence = entry.risk?.confidence ?? 0.5;
+                const riskLevel = entry.risk?.level || 'Medium';
+                if (bannerTitle) bannerTitle.textContent = `${symbol} looks ready to add to your ${dest}.`;
+                if (bannerCopy) bannerCopy.textContent = 'We have enough history to generate a prediction and risk estimate for this stock.';
+                if (bannerPill) {
+                    bannerPill.textContent = confidence >= 0.6 ? 'High confidence' : confidence >= 0.4 ? 'Moderate confidence' : 'Lower confidence';
+                    const clsBase = 'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ';
+                    bannerPill.className =
+                        clsBase +
+                        (confidence >= 0.6
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : confidence >= 0.4
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-red-100 text-red-700');
+                }
+                if (bannerConf) bannerConf.textContent = `Model confidence: ${(confidence * 100).toFixed(1)}%`;
+                if (bannerRisk) bannerRisk.textContent = `Risk: ${riskLevel}`;
+
+                // Mini portfolio impact & risk summary
+                const allocP = Number(allocPercent?.value || 5);
+                const monthly = Number(allocMonthly?.value || 100);
+                const retPct = computeExpectedReturnPct(entry.current_price, entry.predicted_price?.value) ?? 0;
+
+                const deltaLabel = document.getElementById('delta-label');
+                const deltaBar = document.getElementById('delta-bar');
+                const deltaCaption = document.getElementById('delta-caption');
+                const riskChangeLine = document.getElementById('risk-change-line');
+
+                if (deltaLabel && deltaBar && deltaCaption && riskChangeLine) {
+                    const impactScore = allocP * retPct * 0.05 + monthly * 0.02;
+                    const positive = impactScore >= 0;
+                    deltaLabel.textContent = positive ? 'Slightly positive' : 'Could add risk';
+                    deltaBar.style.width = `${Math.min(100, Math.max(10, Math.abs(impactScore) / 15))}%`;
+                    deltaBar.className =
+                        'h-full ' +
+                        (positive
+                            ? 'bg-gradient-to-r from-slate-300 via-emerald-400 to-emerald-500'
+                            : 'bg-gradient-to-r from-slate-300 via-amber-400 to-red-500');
+                    deltaCaption.textContent = positive
+                        ? 'This position nudges expected returns up without dramatically increasing portfolio risk.'
+                        : 'At this size, the position could make your portfolio more volatile. Consider a smaller allocation.';
+
+                    const baseRisk = 'Medium';
+                    riskChangeLine.textContent =
+                        allocP <= 5
+                            ? `Overall portfolio risk likely stays near "${baseRisk}" with this position size.`
+                            : `Larger allocations in ${symbol} could push overall risk slightly above "${baseRisk}".`;
+                }
+            }
+
+            if (addSymbolInput) {
+                addSymbolInput.addEventListener('input', updateValidationAndDelta);
+            }
+            if (addCta) {
+                addCta.addEventListener('click', updateValidationAndDelta);
+            }
+            document.querySelectorAll('input[name="destination"]').forEach((radio) => {
+                radio.addEventListener('change', updateValidationAndDelta);
+            });
+            if (allocPercent) {
+                allocPercent.addEventListener('input', () => {
+                    updateAllocLabels();
+                    updateValidationAndDelta();
+                });
+            }
+            if (allocMonthly) {
+                allocMonthly.addEventListener('input', () => {
+                    updateAllocLabels();
+                    updateValidationAndDelta();
+                });
+            }
+            if (allocHorizon) {
+                allocHorizon.addEventListener('change', () => {
+                    updateValidationAndDelta();
+                });
+            }
+
+            updateAllocLabels();
             renderWatchlist();
+            renderPortfolioPerformanceChart();
+            renderSectorAllocationDonut();
+            renderRiskReturnScatterplot();
             analyzeStock();
         });
     </script>
