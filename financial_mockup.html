@@ -1,11 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+    <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retail Radar - Full Prototype</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* Simple red-green colorblind-friendly overrides */
+        body.colorblind-mode .text-emerald-600 {
+            /* Use a strong blue for "positive" values */
+            color: #2563eb !important; /* tailwind blue-600 */
+        }
+
+        body.colorblind-mode .text-green-700 {
+            color: #1d4ed8 !important; /* blue-700 */
+        }
+
+        body.colorblind-mode .bg-green-100 {
+            background-color: #dbeafe !important; /* blue-100 */
+        }
+
+        body.colorblind-mode .bg-emerald-50 {
+            background-color: #eff6ff !important; /* blue-50 */
+        }
+
+        body.colorblind-mode .bg-emerald-100 {
+            background-color: #dbeafe !important; /* blue-100 */
+        }
+
+        body.colorblind-mode .bg-emerald-200\/60 {
+            background-color: #bfdbfe !important; /* blue-200 with opacity */
+        }
+
+        body.colorblind-mode .bg-yellow-300\/70 {
+            /* Slightly deepen mid risk to avoid looking like "green" */
+            background-color: #facc15 !important; /* yellow-400 */
+        }
+
+        body.colorblind-mode .bg-red-100 {
+            /* Keep "negative" distinct but softer */
+            background-color: #fee2e2 !important; /* red-100 */
+        }
+
+        body.colorblind-mode .text-red-600 {
+            color: #b91c1c !important; /* red-700 */
+        }
+
+        body.colorblind-mode .from-emerald-400 {
+            --tw-gradient-from: #38bdf8 !important; /* sky-400 */
+            --tw-gradient-to: rgb(56 189 248 / 0) !important;
+        }
+
+        body.colorblind-mode .to-emerald-500 {
+            --tw-gradient-to: #0ea5e9 !important; /* sky-500 */
+        }
+
+        /* Dark mode: invert light backgrounds and make text light */
+        body.dark-mode {
+            background-color: #020617; /* slate-950 */
+            color: #e5e7eb; /* slate-200 */
+        }
+
+        body.dark-mode .bg-white {
+            background-color: #020617 !important;
+        }
+
+        body.dark-mode .bg-slate-50 {
+            background-color: #020617 !important;
+        }
+
+        body.dark-mode .bg-slate-100 {
+            background-color: #020617 !important;
+        }
+
+        body.dark-mode .bg-slate-200 {
+            background-color: #020617 !important;
+        }
+
+        body.dark-mode .border-slate-100,
+        body.dark-mode .border-slate-200,
+        body.dark-mode .border-slate-300 {
+            border-color: #1f2937 !important; /* slate-800 */
+        }
+
+        body.dark-mode .text-slate-900,
+        body.dark-mode .text-slate-800,
+        body.dark-mode .text-slate-700,
+        body.dark-mode .text-slate-600,
+        body.dark-mode .text-slate-500,
+        body.dark-mode .text-slate-400 {
+            color: #e5e7eb !important;
+        }
+
+        body.dark-mode .text-red-600 {
+            color: #fecaca !important; /* softer red so it still pops on dark */
+        }
+
+        body.dark-mode .text-yellow-600 {
+            color: #facc15 !important;
+        }
+
+        body.dark-mode .text-indigo-700 {
+            color: #a5b4fc !important;
+        }
+
+        body.dark-mode .bg-indigo-50,
+        body.dark-mode .bg-indigo-600 {
+            background-color: #1e293b !important; /* slate-800-ish card */
+        }
+
+        body.dark-mode input,
+        body.dark-mode select,
+        body.dark-mode textarea {
+            background-color: #020617 !important;
+            color: #e5e7eb !important;
+        }
+
+        body.dark-mode ::placeholder {
+            color: #64748b !important; /* slate-500 */
+        }
+
+        body.dark-mode canvas {
+            background-color: #020617 !important;
+        }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans flex h-screen overflow-hidden">
 
@@ -29,6 +148,22 @@
                 <div class="w-8 h-8 rounded-full bg-slate-300"></div>
                 <div class="text-sm font-medium text-slate-700">Student Investor</div>
             </div>
+            <button
+                id="colorblind-toggle"
+                type="button"
+                onclick="toggleColorblindMode()"
+                class="mt-4 w-full px-4 py-2 text-xs font-medium border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+            >
+                Colorblind mode
+            </button>
+            <button
+                id="darkmode-toggle"
+                type="button"
+                onclick="toggleDarkMode()"
+                class="mt-2 w-full px-4 py-2 text-xs font-medium border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+            >
+                Dark mode
+            </button>
         </div>
     </aside>
 
@@ -1621,6 +1756,24 @@
             if (input) input.value = symbol;
             switchView('dashboard');
             analyzeStock();
+        }
+
+        function toggleColorblindMode() {
+            const body = document.body;
+            const isOn = body.classList.toggle('colorblind-mode');
+            const btn = document.getElementById('colorblind-toggle');
+            if (btn) {
+                btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+            }
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const isOn = body.classList.toggle('dark-mode');
+            const btn = document.getElementById('darkmode-toggle');
+            if (btn) {
+                btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+            }
         }
 
         function renderWatchlist() {
